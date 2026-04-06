@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "magicavoxel-mcp-gen": {
+      "command": "python",
+      "args": ["server.py"]
+    }
+  }
+}
