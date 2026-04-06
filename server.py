@@ -415,6 +415,10 @@ async def handle_list_tools() -> list[types.Tool]:
                         "type": "string",
                         "description": "Output filename for the combined model"
                     },
+                    "output_directory": {
+                        "type": "string",
+                        "description": "Directory path where to save the file (default: current directory)"
+                    },
                     "merge_strategy": {
                         "type": "string",
                         "enum": ["single_object", "scene_graph"],
@@ -481,6 +485,10 @@ async def handle_list_tools() -> list[types.Tool]:
                     "filename": {
                         "type": "string",
                         "description": "Output filename (default: cube.vox)"
+                    },
+                    "output_directory": {
+                        "type": "string",
+                        "description": "Directory path where to save the file (default: current directory)"
                     }
                 },
                 "required": ["size", "color"]
@@ -650,6 +658,7 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> list[types.T
         
         elif name == "combine_and_export":
             filename = arguments["filename"]
+            output_directory = arguments.get("output_directory", ".")
             merge_strategy_str = arguments.get("merge_strategy", "single_object")
             
             if not session.objects:
@@ -658,17 +667,30 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> list[types.T
                     text="Error: No objects in scene to export"
                 )]
             
+            # Create output directory if it doesn't exist
+            import os
+            try:
+                os.makedirs(output_directory, exist_ok=True)
+            except Exception as e:
+                return [types.TextContent(
+                    type="text",
+                    text=f"Error creating directory {output_directory}: {str(e)}"
+                )]
+            
+            # Construct full file path
+            full_path = os.path.join(output_directory, filename)
+            
             # Convert merge strategy
             merge_strategy = MergeStrategy.SINGLE_OBJECT if merge_strategy_str == "single_object" else MergeStrategy.SCENE_GRAPH
             
             # Combine and export
             vox = generator.combine_objects(session.objects, merge_strategy)
-            writer = pyvox.writer.VoxWriter(filename, vox)
+            writer = pyvox.writer.VoxWriter(full_path, vox)
             writer.write()
             
             return [types.TextContent(
                 type="text",
-                text=f"Exported {len(session.objects)} objects to {filename} using {merge_strategy_str} strategy"
+                text=f"Exported {len(session.objects)} objects to {full_path} using {merge_strategy_str} strategy"
             )]
         
         elif name == "clear_scene":
@@ -718,14 +740,28 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> list[types.T
             color = arguments["color"]
             position = arguments.get("position", [0, 0, 0])
             filename = arguments.get("filename", "cube.vox")
+            output_directory = arguments.get("output_directory", ".")
+            
+            # Create output directory if it doesn't exist
+            import os
+            try:
+                os.makedirs(output_directory, exist_ok=True)
+            except Exception as e:
+                return [types.TextContent(
+                    type="text",
+                    text=f"Error creating directory {output_directory}: {str(e)}"
+                )]
+            
+            # Construct full file path
+            full_path = os.path.join(output_directory, filename)
             
             vox = generator.create_cube(size, color, position)
-            writer = pyvox.writer.VoxWriter(filename, vox)
+            writer = pyvox.writer.VoxWriter(full_path, vox)
             writer.write()
             
             return [types.TextContent(
                 type="text",
-                text=f"Created cube: {filename} (size: {size}, color: {color}, position: {position})"
+                text=f"Created cube: {full_path} (size: {size}, color: {color}, position: {position})"
             )]
         
         elif name == "create_sphere":
